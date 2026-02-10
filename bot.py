@@ -4,6 +4,13 @@ from dotenv import load_dotenv
 import os
 from library_api import LibraryAPI
 from csv_exporter import CSVExporter
+import re
+
+year_patterns = [
+    r'^\s*\d{4}\s*-\s*\d{4}\s*$',  
+    r'^\s*\d{4}\s*-\s*\*\s*$',  
+    r'^\s*\*\s*-\s*\d{4}\s*$',  
+    ]
 
 load_dotenv()
 
@@ -57,15 +64,32 @@ def build_limit_markup(selected=None):
 
 def parse_year_range(user_input):
     user_input = user_input.strip()
-    if not user_input:
-        return None, None
-    if "-" in user_input:
-        start, end = user_input.split("-")
-        start = start if start != "*" else None
-        end = end if end != "*" else None
-        return int(start) if start else None, int(end) if end else None
+    
+    for pattern in year_patterns:
+        if re.match(pattern, user_input):
+            break
     else:
-        return int(user_input), None
+        return None, None, False 
+    
+    if '-' in user_input:
+        parts = user_input.split('-')
+        start = parts[0].strip()
+        end = parts[1].strip()
+        
+        start_year = int(start) if start and start != '*' else None
+        end_year = int(end) if end and end != '*' else None
+        
+        if start_year and end_year and start_year > end_year:
+            return None, None, False
+        
+        if start_year and (start_year < 1000 or start_year > 2100):
+            return None, None, False 
+                
+        if end_year and (end_year < 1000 or end_year > 2100):
+            return None, None, False
+            
+        return start_year, end_year, True
+
     
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -73,118 +97,100 @@ def start(message):
     user_state[chat_id] = {}
     bot.send_message(chat_id, "درود! برای جستجوی کتاب لطفاً ابتدا keyword مورد نظر را وارد کنید:")
 
+@bot.message_handler(commands=["cancel"])
+def cancel_command(message):
+    chat_id = message.chat.id
+    if chat_id in user_state:
+        bot.send_message(chat_id, "❌ عملیات کنسل شد.")
+        user_state.pop(chat_id, None)
+        bot.send_message(chat_id, "برای شروع مجدد /start را ارسال کنید.")
+
 @bot.message_handler(func=lambda m: m.chat.id in user_state and "keyword" not in user_state[m.chat.id])
 def handle_keyword(message):
     chat_id = message.chat.id
     user_state[chat_id]["keyword"] = message.text.strip()
     bot.send_message(chat_id, "می‌خواهید فیلتر بر اساس سال اعمال شود؟", reply_markup=ask_year_filtering())
 
-@bot.callback_query_handler(func= lambda call: call.text == "no_yearFiltering")
+@bot.callback_query_handler(func= lambda call: call.data == "no_yearFiltering")
 def no_yearFiltering(call):
-    chat_id = call.chat.id
+    chat_id = call.message.chat.id
     user_state[chat_id]["year_from"] = None
     user_state[chat_id]["year_to"] = None
+    bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
 
-@bot.callback_query_handler(func= lambda call: call.text == "yes_yearFiltering")
-def no_yearFiltering(call):
-    bot.send_message(call.chat.id,"لطفا یکی از گزینه های زیر را انتخاب کنید:",reply_markup=build_year_markup())
+@bot.callback_query_handler(func= lambda call: call.data == "yes_yearFiltering")
+def yes_yearFiltering(call):
+    bot.send_message(call.message.chat.id,"لطفا یکی از گزینه های زیر را انتخاب کنید:",reply_markup=build_year_markup())
 
-@bot.callback_query_handler(func= lambda call: call.text == "year_pre2000")
-def no_yearFiltering(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["year_from"] = None
-    user_state[chat_id]["year_to"] = 2000
+@bot.callback_query_handler(func=lambda call: call.data.startswith("year_"))
+def handle_year_selection(call):
+    chat_id = call.message.chat.id
+    
+    if call.data == "year_pre2000":
+        user_state[chat_id]["year_from"] = None
+        user_state[chat_id]["year_to"] = 2000
+    elif call.data == "year_post2000":
+        user_state[chat_id]["year_from"] = 2000
+        user_state[chat_id]["year_to"] = None
+    elif call.data == "year_post2020":
+        user_state[chat_id]["year_from"] = 2020
+        user_state[chat_id]["year_to"] = None
+    elif call.data == "year_custom":
 
-@bot.callback_query_handler(func= lambda call: call.text == "year_post2000")
-def no_yearFiltering(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["year_from"] = 2000
-    user_state[chat_id]["year_to"] = None
-
-@bot.callback_query_handler(func= lambda call: call.text == "year_post2020")
-def no_yearFiltering(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["year_from"] = 2020
-    user_state[chat_id]["year_to"] = None
-
-@bot.callback_query_handler(func= lambda call: call.text == "year_custom")
-def no_yearFiltering(call):
-    bot.send_message(call.chat.id,
+        bot.send_message(call.message.chat.id,
         "بازه سال را وارد کنید.\n\n"
         "فرمت:\n"
         "- شروع-پایان (مثال: 2000-2020)\n"
         "- فقط شروع (مثال: 2000-*) → از سال 2000 به بعد\n"
         "- فقط پایان (مثال: *-1950) → تا سال 1950\n"
-    )
-    bot.register_next_step_handler(call,callback=optional_year_formater)
+        )
+        bot.register_next_step_handler(call,callback=handle_custom_year_input)
+    
+    bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", 
+                     reply_markup=build_sort_markup())
+    
 
-def optional_year_formater(message):
+def handle_custom_year_input(message):
     chat_id = message.chat.id
-    user_state[chat_id]["year_from"], user_state[chat_id]["year_to"] = parse_year_range(message.text)
-    bot.send_message(chat_id,"نوع مرتب‌سازی را انتخاب کنید:",reply_markup=build_sort_markup())
+    
+    # تحلیل ورودی
+    year_from, year_to, is_valid = parse_year_range(message.text)
+    
+    if not is_valid:
+        error_msg = bot.send_message(
+            chat_id,
+            "❌ **فرمت وارد شده نامعتبر است!**\n\n"
+            "لطفاً یکی از فرمت‌های زیر را وارد کنید:\n"
+            "• `2000-2020`\n"
+            "• `2000-*`\n"
+            "• `*-2020`\n\n"
+        )
+        bot.register_next_step_handler(error_msg, handle_custom_year_input)
+        return
+    
+    user_state[chat_id]["year_from"] = year_from
+    user_state[chat_id]["year_to"] = year_to
+    
+    bot.send_message(chat_id, "✅ **سال با موفقیت تنظیم شد**")
+    bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
 
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_relevance")
-def sort_relevance(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = None
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
+@bot.callback_query_handler(func= lambda call: call.data.startswith("sort_"))
+def handle_sort_selection(call):
+    chat_id = call.message.chat.id
+    sort_type = call.data.replace("sort_", "")
 
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_new")
-def sort_new(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = "new"
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
+    if sort_type == "relevance":
+        user_state[chat_id]["sort"] = None
+    else:
+        user_state[chat_id]["sort"] = sort_type
 
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_old")
-def sort_relevance(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = "old"
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
+    bot.send_message(chat_id, "تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
 
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_trending")
-def sort_relevance(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = "trending"
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
-
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_rating")
-def sort_relevance(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = "rating"
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
-
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_editions")
-def sort_relevance(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = "editions"
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
-
-@bot.callback_query_handler(funck= lambda call : call.text == "sort_random")
-def sort_relevance(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["sort"] = "random"
-    bot.send_message(chat_id,"تعداد کتاب را انتخاب کنید:", reply_markup=build_limit_markup())
-
-@bot.callback_query_handler(func= lambda call : call.text == "limit_10")
-def limit_ten(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["limit"] = 10
-    bot.send_message(chat_id, "در حال جمع‌آوری داده‌ها…")
-    final_step(chat_id)
-
-
-@bot.callback_query_handler(func= lambda call : call.text == "limit_20")
-def limit_twenty(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["limit"] = 20
-    bot.send_message(chat_id, "در حال جمع‌آوری داده‌ها…")
-    final_step(chat_id)
-
-
-@bot.callback_query_handler(func= lambda call : call.text == "limit_50")
-def limit_fifty(call):
-    chat_id = call.chat.id
-    user_state[chat_id]["limit"] = 50
+@bot.callback_query_handler(func= lambda call : call.data.startswith("limit_"))
+def handle_limit_selection(call):
+    chat_id = call.message.chat.id
+    limit = int(call.data.replace("limit_", ""))
+    user_state[chat_id]["limit"] = limit
     bot.send_message(chat_id, "در حال جمع‌آوری داده‌ها…")
     final_step(chat_id)
 
@@ -192,14 +198,23 @@ def limit_fifty(call):
 def final_step(chat_id):
 
     api = LibraryAPI(
-            keyword=user_state.get(chat_id).get["keyword"],
+            keyword=user_state.get(chat_id).get("keyword"),
             year_from=user_state.get(chat_id).get("year_from"),
             year_to=user_state.get(chat_id).get("year_to"),
             limit=user_state.get(chat_id).get("limit"),
             sort=user_state.get(chat_id).get("sort")
         )
+    
     books = api.fetch_books()
-    filename = f"{user_state[chat_id]['keyword']}.csv"
+
+    if not books:  
+        bot.send_message(chat_id, "هیچ کتابی با معیارهای شما یافت نشد.")
+        user_state.pop(chat_id, None)
+        return
+    
+    safe_keyword = re.sub(r'[^\w\-_\. ]', '_', user_state[chat_id]['keyword'])
+    
+    filename = f"{safe_keyword}.csv"
     CSVExporter(filename,books)
 
     with open(filename, "rb") as f:

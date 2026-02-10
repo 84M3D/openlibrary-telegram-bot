@@ -12,7 +12,7 @@ class LibraryAPI:
         self.sort = sort
 
     def fetch_books(self):
-
+        
         query = self.keyword
 
         if self.year_from or self.year_to:
@@ -30,6 +30,8 @@ class LibraryAPI:
             params.update({"sort" : self.sort})
 
         response = requests.get("https://openlibrary.org/search.json", params=params)
+
+        response.raise_for_status()
         
         data = response.json().get("docs")
 
