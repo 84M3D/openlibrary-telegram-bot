@@ -1,44 +1,131 @@
-# OpenLibrary Telegram Bot
+# ربات تلگرام جستجوی کتاب OpenLibrary
 
-Lightweight Telegram bot that searches Open Library and exports results to CSV.
+ربات تلگرامی برای جستجوی کتاب‌ها در **OpenLibrary** و دریافت نتایج به‌صورت فایل CSV.  
+کاربر می‌تواند کلیدواژه، بازه سال انتشار، نوع مرتب‌سازی و تعداد نتایج را مشخص کند.
 
-Files
-- `bot.py`: Main Telegram bot entrypoint and user interaction.
-- `library_api.py`: Open Library API wrapper used to fetch book data.
-- `csv_exporter.py`: Helper to write search results to CSV.
-- `requirements.txt`: Python dependencies.
-- `Procfile`: Heroku process file.
+---
 
-Requirements
-- Python from `runtime.txt`: python-3.13.5
-- Install dependencies:
+## ✨ ویژگی‌ها
+- جستجوی کتاب بر اساس کلیدواژه  
+- فیلتر بر اساس **بازه سال انتشار**  
+  - گزینه‌های از پیش‌تعریف‌شده (پیش از ۲۰۰۰، پس از ۲۰۰۰، پس از ۲۰۲۰)  
+  - **ورود دستی بازه** با فرمت‌های متنوع:  
+    - `2000-2020`  
+    - `2000-*`  
+    - `*-2020`  
+    - `2020`  
+- انتخاب **نوع مرتب‌سازی**:  
+  relevance, new, old, trending, rating, editions, random  
+- انتخاب **تعداد نتایج**: ۱۰، ۲۰ یا ۵۰  
+- دریافت نتایج به‌صورت فایل **CSV** شامل:  
+  - عنوان کتاب  
+  - نام نویسنده (نویسندگان)  
+  - سال اولین انتشار  
+  - لینک کتاب در OpenLibrary  
+- **لغو عملیات** در هر مرحله با دستور `/cancel`  
+- **لاگ‌گیری** کامل از تمام مراحل در فایل `bot_telegram.log`  
 
+---
+
+## 🛠 پیش‌نیازها
+- Python 3.13.5
+- کتابخانه‌های مورد نیاز (در `requirements.txt` ذکر شده):  
+  - `pyTelegramBotAPI`  
+  - `python-dotenv`  
+  - `requests`  
+
+---
+
+## 📦 نصب و راه‌اندازی
+
+### ۱. دریافت کد
+```bash
+git clone https://github.com/yourusername/your-repo.git
+cd your-repo
+```
+
+### ۲. ایجاد محیط مجاز (اختیاری)
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+```
+
+### ۳. نصب وابستگی‌ها
 ```bash
 pip install -r requirements.txt
 ```
 
-Configuration
-- Create a `.env` file or set environment variable `API_KEY` with your Telegram bot token. Example `.env`:
-
+### ۴. تنظیم متغیر محیطی
+یک فایل `.env` در کنار `bot.py` بسازید و کلید ربات تلگرام خود را در آن قرار دهید:
 ```
-API_KEY=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+API_KEY=TOKEN_RBAT_TELEGRAM
 ```
 
-Usage
-- Run locally:
+> توکن ربات را از [@BotFather](https://t.me/BotFather) دریافت کنید.
 
+---
+
+## 🚀 اجرای ربات
 ```bash
 python bot.py
 ```
 
-- The bot will start polling. Use `/start` in Telegram to begin a search. The bot generates a CSV and sends it to the user.
+ربات شروع به کار می‌کند و با دستور `/start` در تلگرام فعال می‌شود.
 
-Deployment
-- This project includes a `Procfile` for Heroku. Ensure `API_KEY` is set in the app's config vars and push the repo to Heroku.
+---
 
-Notes
-- Logs are written to `bot_telegram.log` by default.
-- If you want to change the license holder, update the `LICENSE` file author/year.
+## 🤖 نحوه استفاده
 
-License
-- This project is licensed under the MIT License. See `LICENSE`.
+1. **شروع**  
+   دستور `/start` را ارسال کنید.
+
+2. **ورود کلیدواژه**  
+   عبارت مورد نظر برای جستجو را تایپ کنید.
+
+3. **فیلتر سال**  
+   ربات می‌پرسد: «می‌خواهید فیلتر بر اساس سال اعمال شود؟»  
+   - **خیر** → مرحله مرتب‌سازی  
+   - **بله** → انتخاب یکی از گزینه‌های سال یا ورود دستی بازه
+
+4. **مرتب‌سازی**  
+   یکی از گزینه‌های مرتب‌سازی را انتخاب کنید.
+
+5. **تعداد نتایج**  
+   تعداد کتاب‌های خروجی (۱۰، ۲۰ یا ۵۰) را مشخص کنید.
+
+6. **دریافت فایل CSV**  
+   پس از چند لحظه فایل CSV حاوی اطلاعات کتاب‌ها ارسال می‌شود.
+
+### ⚠️ لغو عملیات
+در هر مرحله می‌توانید با دستور `/cancel` عملیات را متوقف کرده و جلسه را پاک کنید.
+
+---
+
+## 📁 ساختار پروژه
+```
+.
+├── bot.py               # کد اصلی ربات تلگرام
+├── library_api.py       # ارتباط با API کتابخانه OpenLibrary
+├── csv_exporter.py      # تولید فایل CSV از نتایج
+├── .env                 # فایل حاوی توکن ربات (ساخته شود)
+├── requirements.txt     # وابستگی‌های پروژه
+└── README.md            # مستندات پروژه
+```
+
+---
+
+## 📄 مستندات API
+ربات از **OpenLibrary Search API** استفاده می‌کند:  
+[https://openlibrary.org/dev/docs/api/search](https://openlibrary.org/dev/docs/api/search)
+
+---
+
+## 📜 مجوز
+این پروژه تحت مجوز **MIT** منتشر شده است.  
+برای اطلاعات بیشتر فایل `LICENSE` را مطالعه کنید.
+
+---
+
+**حامد یعقوبی** [نام شما]  
+**تاریخ انتشار:** بهمن ۱۴۰۴
