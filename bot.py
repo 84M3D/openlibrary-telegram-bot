@@ -30,7 +30,7 @@ load_dotenv()
 token = os.getenv('API_KEY')
 
 if not token:
-    logger.critical("API_KEY not found in environment variables!")
+    logger.info("API_KEY not found in environment variables!")
     raise ValueError("API_KEY not set")
 
 bot = telebot.TeleBot(token)
@@ -121,12 +121,12 @@ def start(message):
     user_id = message.from_user.id
     
     logger.info(
-        f"👤 START | (user_id: {user_id}) | "
+        f"👤 START | user_id: {user_id} | "
         f"Chat: {chat_id}"
     )
 
     user_state[chat_id] = {}
-    bot.send_message(chat_id, "درود! برای جستجوی کتاب لطفاً ابتدا keyword مورد نظر را وارد کنید:")
+    bot.send_message(chat_id, "درود! برای جستجوی کتاب لطفاً ابتدا کلید واژه مورد نظر را وارد کنید:")
 
 @bot.message_handler(commands=["cancel"])
 def cancel_command(message):
@@ -135,7 +135,7 @@ def cancel_command(message):
 
     if chat_id in user_state:
         logger.info(
-            f"👤 CANCEL | (user_id: {user_id}) | "
+            f"👤 CANCEL | user_id: {user_id} | "
             f"Chat: {chat_id}"
         )
         bot.clear_step_handler_by_chat_id(chat_id)
@@ -144,8 +144,8 @@ def cancel_command(message):
         bot.send_message(chat_id, "برای شروع مجدد /start را ارسال کنید.")
 
     else:
-        logger.warning(
-            f"👤 CANCEL | (user_id: {user_id}) | "
+        logger.info(
+            f"👤 CANCEL | user_id: {user_id} | "
             f"Chat: {chat_id} | No active session"
         )
         bot.send_message(chat_id, "هیچ عملیات فعالی وجود ندارد.")
@@ -156,13 +156,13 @@ def handle_keyword(message):
     user_id = message.from_user.id
     keyword = message.text.strip()
     logger.info(
-        f"👤 KEYWORD | (user_id: {user_id}) | "
+        f"👤 KEYWORD | user_id: {user_id} | "
         f"Chat: {chat_id} | Keyword: '{keyword}'"
     )
 
     if not keyword:
-        logger.warning(
-            f"👤 KEYWORD | (user_id: {user_id}) | "
+        logger.info(
+            f"👤 KEYWORD | user_id: {user_id} | "
             f"Empty keyword"
         )
         bot.send_message(chat_id, "❌ کلمه کلیدی نمی‌تواند خالی باشد. لطفاً دوباره وارد کنید:")
@@ -178,7 +178,7 @@ def no_yearFiltering(call):
     user_id = call.message.from_user.id
 
     logger.info(
-        f"👤 YEAR_FILTER | (user_id: {user_id}) | "
+        f"👤 YEAR_FILTER | user_id: {user_id} | "
         f"Chat: {chat_id} | Selection: No Filtering"
     )
 
@@ -191,7 +191,7 @@ def yes_yearFiltering(call):
     chat_id = call.message.chat.id
     user_id = call.message.from_user.id
     logger.info(
-        f"👤 YEAR_FILTER | (user_id: {user_id}) | "
+        f"👤 YEAR_FILTER | user_id: {user_id} | "
         f"Chat: {chat_id} | Selection: Yes Filtering"
     )
     bot.send_message(call.message.chat.id,"لطفا یکی از گزینه های زیر را انتخاب کنید:",reply_markup=build_year_markup())
@@ -202,7 +202,7 @@ def handle_year_selection(call):
     user_id = call.message.from_user.id
     selection = call.data
     logger.info(
-        f"👤 YEAR_OPTION | (user_id: {user_id}) | "
+        f"👤 YEAR_OPTION | user_id: {user_id} | "
         f"Chat: {chat_id} | Selection: {selection}"
     )
 
@@ -223,8 +223,8 @@ def handle_year_selection(call):
 
     elif selection == "year_custom":
 
-        logger.debug(
-            f"👤 CUSTOM_YEAR | (user_id: {user_id}) | "
+        logger.info(
+            f"👤 CUSTOM_YEAR | user_id: {user_id} | "
             f"Chat: {chat_id} | Entering custom year"
         )
 
@@ -249,7 +249,7 @@ def handle_custom_year_input(message):
     year_input = message.text.strip()
     
     logger.info(
-        f"👤 CUSTOM_YEAR | (user_id: {user_id}) | "
+        f"👤 CUSTOM_YEAR | user_id: {user_id} | "
         f"Chat: {chat_id} | Input: '{year_input}'"
     )
 
@@ -264,8 +264,8 @@ def handle_custom_year_input(message):
     year_from, year_to, is_valid = parse_year_range(message.text)
     
     if not is_valid:
-        logger.warning(
-            f"👤 CUSTOM_YEAR | (user_id: {user_id}) | "
+        logger.info(
+            f"👤 CUSTOM_YEAR | user_id: {user_id} | "
             f"Chat: {chat_id} | Invalid format: '{year_input}'"
         )
 
@@ -277,7 +277,7 @@ def handle_custom_year_input(message):
     user_state[chat_id]["year_to"] = year_to
 
     logger.info(
-        f"👤 CUSTOM_YEAR | (user_id: {user_id}) | "
+        f"👤 CUSTOM_YEAR | user_id: {user_id} | "
         f"Chat: {chat_id} | Set range: {year_from or '*'} to {year_to or '*'}"
     )
     
@@ -291,7 +291,7 @@ def handle_sort_selection(call):
     user_id = call.message.from_user.id
 
     logger.info(
-        f"👤 SORT | (user_id: {user_id}) | "
+        f"👤 SORT | user_id: {user_id} | "
         f"Chat: {chat_id} | Selection: {sort_type}"
     )
 
@@ -309,7 +309,7 @@ def handle_limit_selection(call):
     user_id = call.message.from_user.id
 
     logger.info(
-        f"👤 LIMIT | (user_id: {user_id}) | "
+        f"👤 LIMIT | user_id: {user_id} | "
         f"Chat: {chat_id} | Selection: {limit}"
     )
 
@@ -336,15 +336,15 @@ def final_step(chat_id, user_id):
             )
         
         logger.info(
-            f"📚 SEARCH | (user_id: {user_id}) | "
+            f"📚 SEARCH | user_id: {user_id} | "
             f"Chat: {chat_id} | Keyword: '{state.get('keyword')}', Limit: {state.get('limit')}"
         )
         
         books = api.fetch_books()
 
         if not books:  
-            logger.warning(
-                f"📚 NO_RESULTS | (user_id: {user_id}) | "
+            logger.info(
+                f"📚 NO_RESULTS | user_id: {user_id} | "
                 f"Chat: {chat_id} | Keyword: '{state.get('keyword')}'"
             )
 
@@ -353,7 +353,7 @@ def final_step(chat_id, user_id):
             return
         
         logger.info(
-            f"📚 RESULTS | (user_id: {user_id}) | "
+            f"📚 RESULTS | user_id: {user_id} | "
             f"Chat: {chat_id} | Found {len(books)} books"
         )
         
@@ -361,23 +361,23 @@ def final_step(chat_id, user_id):
         
         filename = f"{safe_keyword}_{user_id}.csv"
 
-        logger.debug(f"📁 CSV | User: {user_id} | Creating file: {filename}")
+        logger.info(f"📁 CSV | User: {user_id} | Creating file: {filename}")
         CSVExporter(filename,books)
 
         with open(filename, "rb") as f:
             bot.send_document(chat_id, f)
 
         logger.info(
-            f"✅ SUCCESS | (user_id: {user_id}) | "
+            f"✅ SUCCESS | user_id: {user_id} | "
             f"Chat: {chat_id} | File sent: {filename}"
         )
 
         os.remove(filename)
-        logger.debug(f"🗑️ CLEANUP | User: {user_id} | Removed: {filename}")
+        logger.info(f"🗑️ CLEANUP | User: {user_id} | Removed: {filename}")
 
     except Exception as e:
-        logger.error(
-            f"❌ ERROR | (user_id: {user_id}) | "
+        logger.info(
+            f"❌ ERROR | user_id: {user_id} | "
             f"Chat: {chat_id} | Error: {str(e)}",
             exc_info=True
         )
@@ -397,4 +397,4 @@ if __name__ == "__main__":
         logger.info("🔄 Starting bot polling...")
         bot.infinity_polling()
     except Exception as e:
-        logger.critical(f"💥 BOT_CRASH | Error: {str(e)}", exc_info=True)
+        logger.info(f"💥 BOT_CRASH | Error: {str(e)}", exc_info=True)
