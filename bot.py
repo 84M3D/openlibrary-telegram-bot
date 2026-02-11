@@ -3,27 +3,20 @@ from telebot.types import InlineKeyboardButton,InlineKeyboardMarkup
 from dotenv import load_dotenv
 import os
 from library_api import LibraryAPI
-from csv_exporter import CSVExporter
+from csv_exporter import export_to_csv
 import re
 import logging
 
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
+telebot.logger.handlers.clear()
+
 file_handler = logging.FileHandler('bot_telegram.log', encoding='utf-8')
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 telebot.logger.addHandler(file_handler)
-
-telebot.logger.removeHandler(telebot.logger.handlers[0])
-
-year_patterns = [
-    r'^\s*\d{4}\s*-\s*\d{4}\s*$',  
-    r'^\s*\d{4}\s*-\s*\*\s*$',  
-    r'^\s*\*\s*-\s*\d{4}\s*$',
-    r'^\s*\d{4}\s*$'
-    ]
 
 load_dotenv()
 
@@ -81,6 +74,14 @@ def build_limit_markup():
     return markup
 
 def parse_year_range(user_input):
+
+    year_patterns = [
+    r'^\s*\d{4}\s*-\s*\d{4}\s*$',  
+    r'^\s*\d{4}\s*-\s*\*\s*$',  
+    r'^\s*\*\s*-\s*\d{4}\s*$',
+    r'^\s*\d{4}\s*$'
+    ]
+
     user_input = user_input.strip()
     
     for pattern in year_patterns:
@@ -94,7 +95,6 @@ def parse_year_range(user_input):
         if year < 1000 or year > 2100:
             return None, None, False
         return year, year, True
-    
 
     parts = user_input.split('-')
     start = parts[0].strip()
@@ -120,10 +120,15 @@ def start(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     
+    if chat_id in user_state:
+        user_state.pop(chat_id)    
+    bot.clear_step_handler_by_chat_id(chat_id)
+    
     logger.info(
         f"👤 START | user_id: {user_id} | "
         f"Chat: {chat_id}"
     )
+
 
     user_state[chat_id] = {}
     bot.send_message(chat_id, "درود! برای جستجوی کتاب لطفاً ابتدا کلید واژه مورد نظر را وارد کنید:")
@@ -173,7 +178,7 @@ def handle_keyword(message):
 
 
 @bot.callback_query_handler(func= lambda call: call.data == "no_yearFiltering")
-def no_yearFiltering(call):
+def handle_no_year_filtering(call):
     chat_id = call.message.chat.id
     user_id = call.message.from_user.id
 
@@ -187,7 +192,7 @@ def no_yearFiltering(call):
     bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
 
 @bot.callback_query_handler(func= lambda call: call.data == "yes_yearFiltering")
-def yes_yearFiltering(call):
+def handle_yes_year_filtering(call):
     chat_id = call.message.chat.id
     user_id = call.message.from_user.id
     logger.info(
@@ -264,7 +269,7 @@ def handle_custom_year_input(message):
     year_from, year_to, is_valid = parse_year_range(message.text)
     
     if not is_valid:
-        logger.info(
+        logger.warning(
             f"👤 CUSTOM_YEAR | user_id: {user_id} | "
             f"Chat: {chat_id} | Invalid format: '{year_input}'"
         )
@@ -362,7 +367,10 @@ def final_step(chat_id, user_id):
         filename = f"{safe_keyword}_{user_id}.csv"
 
         logger.info(f"📁 CSV | User: {user_id} | Creating file: {filename}")
-        CSVExporter(filename,books)
+
+        
+        
+        export_to_csv(filename,books)
 
         with open(filename, "rb") as f:
             bot.send_document(chat_id, f)
@@ -376,7 +384,7 @@ def final_step(chat_id, user_id):
         logger.info(f"🗑️ CLEANUP | User: {user_id} | Removed: {filename}")
 
     except Exception as e:
-        logger.info(
+        logger.error(
             f"❌ ERROR | user_id: {user_id} | "
             f"Chat: {chat_id} | Error: {str(e)}",
             exc_info=True
@@ -397,4 +405,4 @@ if __name__ == "__main__":
         logger.info("🔄 Starting bot polling...")
         bot.infinity_polling()
     except Exception as e:
-        logger.info(f"💥 BOT_CRASH | Error: {str(e)}", exc_info=True)
+        logger.error(f"💥 BOT_CRASH | Error: {str(e)}", exc_info=True)
