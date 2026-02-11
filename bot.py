@@ -16,7 +16,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 file_handler.setFormatter(formatter)
 telebot.logger.addHandler(file_handler)
 
-# telebot.logger.removeHandler(telebot.logger.handlers[0])
+telebot.logger.removeHandler(telebot.logger.handlers[0])
 
 year_patterns = [
     r'^\s*\d{4}\s*-\s*\d{4}\s*$',  
