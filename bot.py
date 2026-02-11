@@ -21,7 +21,8 @@ telebot.logger.addHandler(file_handler)
 year_patterns = [
     r'^\s*\d{4}\s*-\s*\d{4}\s*$',  
     r'^\s*\d{4}\s*-\s*\*\s*$',  
-    r'^\s*\*\s*-\s*\d{4}\s*$',  
+    r'^\s*\*\s*-\s*\d{4}\s*$',
+    r'^\s*\d{4}\s*$'
     ]
 
 load_dotenv()
@@ -63,21 +64,19 @@ def ask_year_filtering():
     markup.add(*buttons)
     return markup
 
-def build_sort_markup(selected=None):
+def build_sort_markup():
     markup = InlineKeyboardMarkup(row_width=3)
     buttons = []
     for option in sort_options:
-        text = f"{option} {'✅' if option==selected else ''}"
-        buttons.append(InlineKeyboardButton(text, callback_data=f"sort_{option}"))
+        buttons.append(InlineKeyboardButton(option, callback_data=f"sort_{option}"))
     markup.add(*buttons)
     return markup
 
-def build_limit_markup(selected=None):
+def build_limit_markup():
     markup = InlineKeyboardMarkup(row_width=3)
     buttons = []
     for option in limit_options:
-        text = f"{option} {'✅' if option==selected else ''}"
-        buttons.append(InlineKeyboardButton(text, callback_data=f"limit_{option}"))
+        buttons.append(InlineKeyboardButton(str(option), callback_data=f"limit_{option}"))
     markup.add(*buttons)
     return markup
 
@@ -90,24 +89,30 @@ def parse_year_range(user_input):
     else:
         return None, None, False 
     
-    if '-' in user_input:
-        parts = user_input.split('-')
-        start = parts[0].strip()
-        end = parts[1].strip()
-        
-        start_year = int(start) if start and start != '*' else None
-        end_year = int(end) if end and end != '*' else None
-        
-        if start_year and end_year and start_year > end_year:
+    if '-' not in user_input:
+        year = int(user_input)
+        if year < 1000 or year > 2100:
             return None, None, False
-        
-        if start_year and (start_year < 1000 or start_year > 2100):
-            return None, None, False 
-                
-        if end_year and (end_year < 1000 or end_year > 2100):
-            return None, None, False
+        return year, year, True
+    
+
+    parts = user_input.split('-')
+    start = parts[0].strip()
+    end = parts[1].strip()
+    
+    start_year = int(start) if start and start != '*' else None
+    end_year = int(end) if end and end != '*' else None
+    
+    if start_year and end_year and start_year > end_year:
+        return None, None, False
+    
+    if start_year and (start_year < 1000 or start_year > 2100):
+        return None, None, False 
             
-        return start_year, end_year, True
+    if end_year and (end_year < 1000 or end_year > 2100):
+        return None, None, False
+        
+    return start_year, end_year, True
 
     
 @bot.message_handler(commands=["start"])
@@ -133,7 +138,7 @@ def cancel_command(message):
             f"👤 CANCEL | (user_id: {user_id}) | "
             f"Chat: {chat_id}"
         )
-
+        bot.clear_step_handler_by_chat_id(chat_id)
         bot.send_message(chat_id, "❌ عملیات کنسل شد.")
         user_state.pop(chat_id, None)
         bot.send_message(chat_id, "برای شروع مجدد /start را ارسال کنید.")
@@ -204,12 +209,18 @@ def handle_year_selection(call):
     if selection == "year_pre2000":
         user_state[chat_id]["year_from"] = None
         user_state[chat_id]["year_to"] = 2000
+        bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
+    
     elif selection == "year_post2000":
         user_state[chat_id]["year_from"] = 2000
         user_state[chat_id]["year_to"] = None
+        bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
+    
     elif selection == "year_post2020":
         user_state[chat_id]["year_from"] = 2020
         user_state[chat_id]["year_to"] = None
+        bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
+
     elif selection == "year_custom":
 
         logger.debug(
@@ -217,17 +228,19 @@ def handle_year_selection(call):
             f"Chat: {chat_id} | Entering custom year"
         )
 
-        bot.send_message(call.message.chat.id,
-        "بازه سال را وارد کنید.\n\n"
-        "فرمت:\n"
-        "- شروع-پایان (مثال: 2000-2020)\n"
-        "- فقط شروع (مثال: 2000-*) → از سال 2000 به بعد\n"
-        "- فقط پایان (مثال: *-1950) → تا سال 1950\n"
+        msg = (
+        "📅 **بازه سال را وارد کنید**\n\n"
+        "✅ **فرمت‌های مجاز:**\n"
+        "• `2000-2020`\n  (بین این دو سال)\n\n"
+        "• `2000-*`\n     (از سال 2000 به بعد)\n\n"
+        "• `*-2020`\n     (تا سال 2020)\n\n"
+        "• `2020`\n       (فقط سال 2020)\n\n"
+        "لطفاً یکی از فرمت‌های بالا را وارد کنید:"
         )
-        bot.register_next_step_handler(call,callback=handle_custom_year_input)
-    
-    bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", 
-                     reply_markup=build_sort_markup())
+
+        bot.send_message(chat_id, msg, parse_mode="Markdown")
+
+        bot.register_next_step_handler(call.message, handle_custom_year_input)
     
 
 def handle_custom_year_input(message):
@@ -240,6 +253,14 @@ def handle_custom_year_input(message):
         f"Chat: {chat_id} | Input: '{year_input}'"
     )
 
+    if year_input.startswith('/'):
+        if year_input == '/cancel':
+            cancel_command(message) 
+        else:
+            bot.send_message(chat_id, "⚠️ در حال انجام عملیات جستجو هستید. لطفاً ابتدا آن را با /cancel تمام کنید.")
+            bot.register_next_step_handler(message, handle_custom_year_input)
+        return
+
     year_from, year_to, is_valid = parse_year_range(message.text)
     
     if not is_valid:
@@ -247,16 +268,9 @@ def handle_custom_year_input(message):
             f"👤 CUSTOM_YEAR | (user_id: {user_id}) | "
             f"Chat: {chat_id} | Invalid format: '{year_input}'"
         )
-    
-        bot.send_message(
-            chat_id,
-            "❌ **فرمت وارد شده نامعتبر است!**\n\n"
-            "لطفاً یکی از فرمت‌های زیر را وارد کنید:\n"
-            "• `2000-2020`\n"
-            "• `2000-*`\n"
-            "• `*-2020`\n\n"
-        )
-        bot.register_next_step_handler("وارد کنید:",handle_custom_year_input)
+
+        bot.send_message(chat_id,"❌ **فرمت وارد شده نامعتبر است!** ...\nدوباره تلاش کنید:" , parse_mode="markdown")
+        bot.register_next_step_handler(message, handle_custom_year_input)
         return
     
     user_state[chat_id]["year_from"] = year_from
@@ -267,7 +281,7 @@ def handle_custom_year_input(message):
         f"Chat: {chat_id} | Set range: {year_from or '*'} to {year_to or '*'}"
     )
     
-    bot.send_message(chat_id, "✅ **سال با موفقیت تنظیم شد**")
+    bot.send_message(chat_id, "✅ **سال با موفقیت تنظیم شد**", parse_mode="Markdown")
     bot.send_message(chat_id, "نوع مرتب‌سازی را انتخاب کنید:", reply_markup=build_sort_markup())
 
 @bot.callback_query_handler(func= lambda call: call.data.startswith("sort_"))
@@ -308,17 +322,22 @@ def final_step(chat_id, user_id):
 
     try:
 
+        state = user_state.get(chat_id)
+        if not state:
+            bot.send_message(chat_id, "خطا: نشست فعال نیست. لطفاً /start را بزنید.")
+            return
+
         api = LibraryAPI(
-                keyword=user_state.get(chat_id).get("keyword"),
-                year_from=user_state.get(chat_id).get("year_from"),
-                year_to=user_state.get(chat_id).get("year_to"),
-                limit=user_state.get(chat_id).get("limit"),
-                sort=user_state.get(chat_id).get("sort")
+                keyword=state.get("keyword"),
+                year_from=state.get("year_from"),
+                year_to=state.get("year_to"),
+                limit=state.get("limit"),
+                sort=state.get("sort")
             )
         
         logger.info(
             f"📚 SEARCH | (user_id: {user_id}) | "
-            f"Chat: {chat_id} | Keyword: '{user_state.get(chat_id).get("keyword")}', Limit: {user_state.get(chat_id).get("limit")}"
+            f"Chat: {chat_id} | Keyword: '{state.get('keyword')}', Limit: {state.get('limit')}"
         )
         
         books = api.fetch_books()
@@ -326,7 +345,7 @@ def final_step(chat_id, user_id):
         if not books:  
             logger.warning(
                 f"📚 NO_RESULTS | (user_id: {user_id}) | "
-                f"Chat: {chat_id} | Keyword: '{user_state.get(chat_id).get("keyword")}'"
+                f"Chat: {chat_id} | Keyword: '{state.get('keyword')}'"
             )
 
             bot.send_message(chat_id, "هیچ کتابی با معیارهای شما یافت نشد.")
@@ -340,7 +359,7 @@ def final_step(chat_id, user_id):
         
         safe_keyword = re.sub(r'[^\w\-_\. ]', '_', user_state[chat_id]['keyword'])
         
-        filename = f"{safe_keyword}.csv"
+        filename = f"{safe_keyword}_{user_id}.csv"
 
         logger.debug(f"📁 CSV | User: {user_id} | Creating file: {filename}")
         CSVExporter(filename,books)
@@ -349,14 +368,12 @@ def final_step(chat_id, user_id):
             bot.send_document(chat_id, f)
 
         logger.info(
-            f"✅ SUCCESS | User: @{username} (user_id: {user_id}) | "
+            f"✅ SUCCESS | (user_id: {user_id}) | "
             f"Chat: {chat_id} | File sent: {filename}"
         )
 
         os.remove(filename)
         logger.debug(f"🗑️ CLEANUP | User: {user_id} | Removed: {filename}")
-
-        logger.info(f"✅ SESSION_END | User: {user_id} | Chat: {chat_id} | Session cleared")
 
     except Exception as e:
         logger.error(

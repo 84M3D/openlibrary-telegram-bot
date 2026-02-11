@@ -38,10 +38,9 @@ class LibraryAPI:
             books = []
             for book in data:
                 authors = book.get("author_name")
-                authors_str = " & ".join(authors)
+                authors_str = " & ".join(authors) if authors else "Unknown"
                 books.append({
                     "title": book.get("title"),
-                    "subtitle": book.get("subtitle"),
                     "author_name": authors_str,
                     "first_publish_year": book.get("first_publish_year"),
                     "url": urljoin(baseUrl,book.get("key"))
