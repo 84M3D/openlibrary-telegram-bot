@@ -12,38 +12,50 @@ class LibraryAPI:
         self.sort = sort
 
     def fetch_books(self):
+        try:
+            query = self.keyword
+
+            if self.year_from or self.year_to:
+                from_year = self.year_from if self.year_from else "*"
+                to_year = self.year_to if self.year_to else "*"
+                query += f" first_publish_year:[{from_year} TO {to_year}]"
+
+
+            params = {
+                "q": query,
+                "limit": self.limit
+            }
+
+            if self.sort :
+                params.update({"sort" : self.sort})
+
+            response = requests.get("https://openlibrary.org/search.json", params=params, timeout=10)
+
+            response.raise_for_status()
+            
+            data = response.json().get("docs")
+
+            books = []
+            for book in data:
+                authors = book.get("author_name")
+                authors_str = " & ".join(authors)
+                books.append({
+                    "title": book.get("title"),
+                    "subtitle": book.get("subtitle"),
+                    "author_name": authors_str,
+                    "first_publish_year": book.get("first_publish_year"),
+                    "url": urljoin(baseUrl,book.get("key"))
+                })
+            return books
         
-        query = self.keyword
+        except requests.exceptions.Timeout:
+            raise Exception("Timeout")
 
-        if self.year_from or self.year_to:
-            from_year = self.year_from if self.year_from else "*"
-            to_year = self.year_to if self.year_to else "*"
-            query += f" first_publish_year:[{from_year} TO {to_year}]"
+        except requests.exceptions.ConnectionError:
+            raise Exception("Connection Error")
 
+        except requests.exceptions.HTTPError as e:
+            raise Exception(f"HTTP Error: {e}")
 
-        params = {
-            "q": query,
-            "limit": self.limit
-        }
-
-        if self.sort :
-            params.update({"sort" : self.sort})
-
-        response = requests.get("https://openlibrary.org/search.json", params=params)
-
-        response.raise_for_status()
-        
-        data = response.json().get("docs")
-
-        books = []
-        for book in data:
-            authors = book.get("author_name")
-            authors_str = " & ".join(authors)
-            books.append({
-                "title": book.get("title"),
-                "subtitle": book.get("subtitle"),
-                "author_name": authors_str,
-                "first_publish_year": book.get("first_publish_year"),
-                "url": urljoin(baseUrl,book.get("key"))
-            })
-        return books
+        except Exception as e:
+            raise Exception(f"Unknown Error: {e}")
