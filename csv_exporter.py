@@ -1,5 +1,5 @@
 import csv
-def export_to_csv(filename, books):
+def export_to_csv(filename : str, books : list[dict[str, str]]):
     if not books:
         return
     headers = books[0].keys()

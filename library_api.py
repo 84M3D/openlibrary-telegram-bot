@@ -4,20 +4,20 @@ from urllib.parse import urljoin
 baseUrl = "https://openlibrary.org/"
 
 class LibraryAPI:
-    def __init__(self, keyword, year_from=None, year_to=None, limit=50, sort=None):
-        self.keyword = keyword
-        self.year_from = year_from
-        self.year_to = year_to
-        self.limit = limit
-        self.sort = sort
+    def __init__(self, keyword : str, year_from : str=None, year_to : str=None, limit : int=50, sort : str=None):
+        self.keyword : str = keyword
+        self.year_from : str = year_from
+        self.year_to : str = year_to
+        self.limit : int  = limit
+        self.sort : str = sort
 
     def fetch_books(self):
         try:
-            query = self.keyword
+            query : str = self.keyword
 
             if self.year_from or self.year_to:
-                from_year = self.year_from if self.year_from else "*"
-                to_year = self.year_to if self.year_to else "*"
+                from_year : str  = self.year_from if self.year_from else "*"
+                to_year : str  = self.year_to if self.year_to else "*"
                 query += f" first_publish_year:[{from_year} TO {to_year}]"
 
 
@@ -33,7 +33,7 @@ class LibraryAPI:
 
             response.raise_for_status()
             
-            data = response.json().get("docs")
+            data : list[dict[str, str]] | None = response.json().get("docs")
 
             books = []
             for book in data:
